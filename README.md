@@ -694,7 +694,7 @@ Combinational logic accounts for approximately **91.2%** of the reported power, 
 
 Both technologies were taken through the complete physical-design flow:
 
-```text
+``text
 RTL
  │
  ▼
@@ -732,7 +732,6 @@ DEF / SPEF / Verilog
  │
  ▼
 Final GDSII
-
 # 13. Proposed X-HEEP Register Map
 
 > **Note:** These addresses are provisional and will be finalized during X-HEEP integration.
@@ -756,16 +755,18 @@ Final GDSII
 
 ### Control Register
 
-```text
-CONTROL[0] = START
-```
+| Bit | Name | Description |
+|---:|---|---|
+| 0 | `START` | Writing `1` starts an AES-128 encryption operation |
+| 31:1 | Reserved | Reserved for future use |
 
 ### Status Register
 
-```text
-STATUS[0] = BUSY
-STATUS[1] = DONE
-```
+| Bit | Name | Description |
+|---:|---|---|
+| 0 | `BUSY` | `1` while encryption is in progress |
+| 1 | `DONE` | `1` when encryption is complete |
+| 31:2 | Reserved | Reserved for future use |
 
 ---
 
