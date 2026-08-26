@@ -1,983 +1,812 @@
-============================================================
-AES-128 HARDWARE ACCELERATOR — VERILOG SPECIFICATION
+# AES128-XHEEP
 
+## AES-128 Encryption Accelerator
 
-PROJECT:
-AES-128 Encryption Accelerator for X-HEEP
+A synthesizable **AES-128 encryption accelerator** implemented in SystemVerilog, designed for eventual integration as a memory-mapped peripheral in the **X-HEEP RISC-V SoC**.
 
-CURRENT HARDWARE STATUS:
-Standalone AES-128 encryption core is complete and verified.
+The project follows a modular RTL architecture where each AES transformation is implemented and verified independently before being integrated into the complete encryption core.
 
-TOP-LEVEL AES CORE:
-    rtl/aes_core.sv
+---
 
-The AES core is independent of X-HEEP.
-X-HEEP will be connected later through a peripheral wrapper.
+## Project Status
 
+### Standalone AES-128 Core — Complete
 
-============================================================
-1. AES CORE INTERFACE
-============================================================
+- [x] AES S-box
+- [x] SubBytes
+- [x] ShiftRows
+- [x] MixColumns
+- [x] AddRoundKey
+- [x] AES-128 Key Expansion
+- [x] AES Normal Round
+- [x] AES Final Round
+- [x] Round Controller
+- [x] Complete AES-128 Core
+- [x] Standard AES-128 test-vector verification
 
-Module:
+### X-HEEP Integration — In Progress
 
-    aes_core
+- [ ] X-HEEP peripheral wrapper
+- [ ] Memory-mapped register interface
+- [ ] X-HEEP SoC integration
+- [ ] C software driver
+- [ ] Hardware/software verification
+- [ ] Software vs hardware performance benchmark
+- [ ] Synthesis
+- [ ] Area, timing and power analysis
 
-Ports:
+---
 
-    input  logic         clk
-    input  logic         rst_n
-    input  logic         start
+# 1. AES-128 Overview
 
-    input  logic [127:0] plaintext
-    input  logic [127:0] key
+AES (Advanced Encryption Standard) is a symmetric block cipher standardized by NIST.
 
-    output logic [127:0] ciphertext
-    output logic         busy
-    output logic         done
+AES-128 operates on:
 
+- **128-bit plaintext**
+- **128-bit encryption key**
+- **128-bit ciphertext**
 
-FUNCTION:
+AES-128 performs:
 
-    plaintext + key
-            |
-            v
-        AES-128
-            |
-            v
-       ciphertext
+- 1 initial AddRoundKey operation
+- 9 standard AES rounds
+- 1 final AES round
 
+Therefore, the encryption consists of **10 rounds**.
 
-CONTROL:
+---
 
-    start = 1
-        -> begins one AES-128 encryption operation
+# 2. AES-128 Data Format
 
-    busy = 1
-        -> AES core is currently processing
+AES operates on a 128-bit block:
 
-    done = 1
-        -> encryption has completed
-        -> ciphertext is valid
-
-
-The AES core is MULTI-CYCLE.
-
-Software MUST NOT assume that ciphertext is available
-immediately after asserting start.
-
-Software should:
-
-    1. Write plaintext
-    2. Write key
-    3. Assert START
-    4. Wait until DONE
-    5. Read ciphertext
-
-
-============================================================
-2. AES-128 DATA FORMAT
-============================================================
-
-AES operates on:
-
-    128-bit plaintext
-    128-bit key
-    128-bit ciphertext
-
-Each 128-bit value contains:
-
-    16 bytes
+```text
+128 bits = 16 bytes
+```
 
 Example plaintext:
 
-    00112233445566778899AABBCCDDEEFF
+```text
+00112233445566778899AABBCCDDEEFF
+```
+
+The 16 bytes are:
+
+```text
+00 11 22 33 44 55 66 77
+88 99 AA BB CC DD EE FF
+```
+
+The AES-128 key is also 128 bits:
+
+```text
+000102030405060708090A0B0C0D0E0F
+```
+
+---
+
+# 3. AES Encryption Flow
+
+The complete AES-128 encryption flow is:
+
+```text
+                 Plaintext
+                     │
+                     ▼
+              AddRoundKey
+                     │
+                     ▼
+              ┌─────────────┐
+              │   Round 1   │
+              └──────┬──────┘
+                     │
+                    ...
+                     │
+              ┌──────▼──────┐
+              │   Round 9   │
+              └──────┬──────┘
+                     │
+              ┌──────▼──────┐
+              │  Round 10   │
+              │ Final Round │
+              └──────┬──────┘
+                     │
+                     ▼
+                Ciphertext
+```
+
+### Rounds 1–9
+
+Each standard round performs:
+
+```text
+SubBytes
+    ↓
+ShiftRows
+    ↓
+MixColumns
+    ↓
+AddRoundKey
+```
+
+### Round 10
+
+The final round performs:
+
+```text
+SubBytes
+    ↓
+ShiftRows
+    ↓
+AddRoundKey
+```
+
+**MixColumns is intentionally omitted from the final round.**
+
+---
+
+# 4. RTL Architecture
+
+The project is divided into independent SystemVerilog modules.
+
+```text
+aes_core
+│
+├── round_controller
+│
+├── key_expansion
+│   └── aes_sbox
+│
+├── add_round_key
+│
+├── aes_round
+│   ├── sub_bytes
+│   │   └── aes_sbox
+│   ├── shift_rows
+│   ├── mix_columns
+│   └── add_round_key
+│
+└── aes_final_round
+    ├── sub_bytes
+    │   └── aes_sbox
+    ├── shift_rows
+    └── add_round_key
+```
 
-Bytes:
+---
 
-    00 11 22 33 44 55 66 77
-    88 99 AA BB CC DD EE FF
+# 5. AES RTL Modules
 
+## `aes_sbox.sv`
 
-============================================================
-3. SOFTWARE ↔ HARDWARE 32-BIT WORD MAPPING
-============================================================
+Implements the standard AES S-box.
 
-Because the RISC-V CPU uses 32-bit registers, each
-128-bit AES value is divided into four 32-bit words.
-
-PLAINTEXT:
-
-    PLAINTEXT_0 = 00112233
-    PLAINTEXT_1 = 44556677
-    PLAINTEXT_2 = 8899AABB
-    PLAINTEXT_3 = CCDDEEFF
-
-The hardware reconstructs:
-
-    plaintext =
-        {PLAINTEXT_0,
-         PLAINTEXT_1,
-         PLAINTEXT_2,
-         PLAINTEXT_3};
-
-
-KEY:
-
-    KEY_0 = 00010203
-    KEY_1 = 04050607
-    KEY_2 = 08090A0B
-    KEY_3 = 0C0D0E0F
-
-The hardware reconstructs:
-
-    key =
-        {KEY_0,
-         KEY_1,
-         KEY_2,
-         KEY_3};
-
-
-CIPHERTEXT:
-
-    CIPHERTEXT_0 = ciphertext[127:96]
-    CIPHERTEXT_1 = ciphertext[95:64]
-    CIPHERTEXT_2 = ciphertext[63:32]
-    CIPHERTEXT_3 = ciphertext[31:0]
-
-
-============================================================
-4. PROPOSED X-HEEP MEMORY-MAPPED REGISTER INTERFACE
-============================================================
-
-These are the proposed addresses for the X-HEEP wrapper.
-
-IMPORTANT:
-These addresses are the planned interface.
-They are NOT yet implemented in the current standalone
-AES core.
-
-OFFSET      REGISTER          ACCESS
-------------------------------------------------
-0x00        PLAINTEXT_0       WRITE
-0x04        PLAINTEXT_1       WRITE
-0x08        PLAINTEXT_2       WRITE
-0x0C        PLAINTEXT_3       WRITE
-
-0x10        KEY_0             WRITE
-0x14        KEY_1             WRITE
-0x18        KEY_2             WRITE
-0x1C        KEY_3             WRITE
-
-0x20        CONTROL           WRITE
-0x24        STATUS            READ
-
-0x28        CIPHERTEXT_0      READ
-0x2C        CIPHERTEXT_1      READ
-0x30        CIPHERTEXT_2      READ
-0x34        CIPHERTEXT_3      READ
-
-
-============================================================
-5. CONTROL REGISTER
-============================================================
-
-Address:
-
-    0x20
-
-CONTROL[0]:
-
-    START
-
-    0 = no action
-    1 = start AES encryption
-
-
-Software sequence:
-
-    CONTROL = 1;
-
-
-The hardware starts the encryption operation.
-
-
-============================================================
-6. STATUS REGISTER
-============================================================
-
-Address:
-
-    0x24
-
-
-STATUS[0]:
-
-    BUSY
-
-    0 = AES core idle
-    1 = AES core processing
-
-
-STATUS[1]:
-
-    DONE
-
-    0 = encryption not completed
-    1 = encryption completed
-
-
-Expected software behavior:
-
-    while (STATUS & BUSY)
-        ;
-
-
-or:
-
-    while (!(STATUS & DONE))
-        ;
-
-
-After DONE becomes 1:
-
-    ciphertext registers contain valid ciphertext.
-
-
-============================================================
-7. CIPHERTEXT REGISTERS
-============================================================
-
-Addresses:
-
-    0x28 = CIPHERTEXT_0
-    0x2C = CIPHERTEXT_1
-    0x30 = CIPHERTEXT_2
-    0x34 = CIPHERTEXT_3
-
-
-For ciphertext:
-
-    69C4E0D86A7B0430D8CDB78070B4C55A
-
-Registers contain:
-
-    CIPHERTEXT_0 = 69C4E0D8
-    CIPHERTEXT_1 = 6A7B0430
-    CIPHERTEXT_2 = D8CDB780
-    CIPHERTEXT_3 = 70B4C55A
-
-
-============================================================
-8. AES INTERNAL RTL MODULES
-============================================================
-
-The current RTL hierarchy is:
-
-    aes_core
-    |
-    +-- round_controller
-    |
-    +-- key_expansion
-    |      |
-    |      +-- aes_sbox
-    |
-    +-- add_round_key
-    |
-    +-- aes_round
-    |      |
-    |      +-- sub_bytes
-    |      |      |
-    |      |      +-- aes_sbox
-    |      |
-    |      +-- shift_rows
-    |      |
-    |      +-- mix_columns
-    |      |
-    |      +-- add_round_key
-    |
-    +-- aes_final_round
-           |
-           +-- sub_bytes
-           |      |
-           |      +-- aes_sbox
-           |
-           +-- shift_rows
-           |
-           +-- add_round_key
-
-
-============================================================
-9. AES S-BOX
-============================================================
-
-Module:
-
-    aes_sbox
-
-Input:
-
-    8-bit byte
-
-Output:
-
-    8-bit substituted byte
-
-The S-box is the STANDARD AES S-box.
-
-It is not a custom S-box.
+The S-box maps an 8-bit input to an 8-bit output.
 
 Example:
 
-    input  = 8'h00
-    output = 8'h63
+```text
+Input  : 00
+Output : 63
 
-    input  = 8'h53
-    output = 8'hED
+Input  : 53
+Output : ED
+```
 
-The S-box was individually tested.
+The AES S-box is a standardized transformation and is not custom-designed for this project.
 
+---
 
-============================================================
-10. SUB_BYTES
-============================================================
+## `sub_bytes.sv`
 
-Module:
+Applies the AES S-box independently to all 16 bytes of the 128-bit state.
 
-    sub_bytes
+```text
+128-bit state
+      │
+      ▼
+┌─────────────────┐
+│ 16 × AES S-box  │
+└────────┬────────┘
+         │
+         ▼
+128-bit state
+```
 
-Input:
+---
 
-    128-bit AES state
+## `shift_rows.sv`
 
-Operation:
+Implements the AES ShiftRows permutation.
 
-    Apply AES S-box independently to all 16 bytes.
+The AES state is arranged as four rows of four bytes.
 
-Example:
+```text
+Row 0 → shift by 0
+Row 1 → shift by 1
+Row 2 → shift by 2
+Row 3 → shift by 3
+```
 
-    input:
-        00112233445566778899AABBCCDDEEFF
+ShiftRows is purely a byte permutation and does not require arithmetic.
 
-    output:
-        63CAB7040953D051CD60E0E7BA70E18C
+---
 
+## `mix_columns.sv`
 
-============================================================
-11. SHIFT_ROWS
-============================================================
+Implements the AES MixColumns transformation.
 
-Module:
+Each AES column contains four bytes.
 
-    shift_rows
+The transformation uses arithmetic over:
 
-Input:
+```text
+GF(2^8)
+```
 
-    128-bit AES state
+This is one of the main arithmetic blocks in the AES datapath.
 
-Operation:
+---
 
-    AES ShiftRows byte permutation.
+## `add_round_key.sv`
 
-Row 0:
+Performs the AES AddRoundKey operation.
 
-    shift by 0
+The operation is simply:
 
-Row 1:
+```text
+state_out = state_in XOR round_key
+```
 
-    shift by 1
+---
 
-Row 2:
+## `key_expansion.sv`
 
-    shift by 2
+Generates all 11 round keys required by AES-128.
 
-Row 3:
-
-    shift by 3
-
-No arithmetic is performed.
-
-It is purely a byte permutation/wiring operation.
-
-
-============================================================
-12. MIX_COLUMNS
-============================================================
-
-Module:
-
-    mix_columns
-
-Input:
-
-    128-bit AES state
-
-Operation:
-
-    AES MixColumns transformation.
-
-The calculation is performed in:
-
-    GF(2^8)
-
-Each AES column consists of four bytes.
-
-The standard AES MixColumns matrix is used.
-
-The module was individually tested.
-
-
-============================================================
-13. ADD_ROUND_KEY
-============================================================
-
-Module:
-
-    add_round_key
-
-Inputs:
-
-    state_in  = 128 bits
-    round_key = 128 bits
-
-Output:
-
-    state_out = 128 bits
-
-Operation:
-
-    state_out = state_in XOR round_key
-
-No other mathematical operation is performed.
-
-
-============================================================
-14. KEY EXPANSION
-============================================================
-
-Module:
-
-    key_expansion
-
-Input:
-
-    128-bit original AES key
-
-Output:
-
-    Round Keys 0 through 10
-
-AES-128 requires:
-
-    11 round keys
-
-Round:
-
-    0  -> initial key
-    1  -> round 1 key
-    2  -> round 2 key
-    ...
-    10 -> round 10 key
-
-
-Key expansion uses:
-
-    RotWord
-    SubWord
-    Rcon
-    XOR operations
-
-
-The AES S-box is reused for SubWord.
-
-
-============================================================
-15. AES ROUND
-============================================================
-
-Module:
-
-    aes_round
-
-Used for:
-
-    AES rounds 1 through 9
-
-
-Data path:
-
-    State
-      |
-      v
-    SubBytes
-      |
-      v
-    ShiftRows
-      |
-      v
-    MixColumns
-      |
-      v
-    AddRoundKey
-      |
-      v
-    New State
-
-
-One physical aes_round module is reused for
-multiple AES rounds.
-
-We DO NOT instantiate nine separate AES round blocks.
-
-
-============================================================
-16. AES FINAL ROUND
-============================================================
-
-Module:
-
-    aes_final_round
-
-Used for:
-
-    AES round 10
-
-
-Data path:
-
-    State
-      |
-      v
-    SubBytes
-      |
-      v
-    ShiftRows
-      |
-      v
-    AddRoundKey
-      |
-      v
-    Ciphertext
-
-
-IMPORTANT:
-
-    MixColumns is NOT performed in Round 10.
-
-
-============================================================
-17. ROUND CONTROLLER
-============================================================
-
-Module:
-
-    round_controller
-
-Controls the AES encryption sequence.
-
-Sequence:
-
-    IDLE
-      |
-      | start
-      v
-    INIT
-      |
-      v
-    ROUND 1
-      |
-      v
-    ROUND 2
-      |
-      v
-    ROUND 3
-      |
-      v
-    ...
-      |
-      v
-    ROUND 9
-      |
-      v
-    FINAL ROUND 10
-      |
-      v
-    DONE
-      |
-      v
-    IDLE
-
+```text
+Round 0  → Key 0
+Round 1  → Key 1
+Round 2  → Key 2
+...
+Round 10 → Key 10
+```
+
+The key schedule uses:
+
+- RotWord
+- SubWord
+- Rcon
+- XOR operations
+
+The AES S-box is reused for the SubWord operation.
+
+---
+
+## `aes_round.sv`
+
+Implements a complete standard AES round.
+
+```text
+state_in
+   │
+   ▼
+SubBytes
+   │
+   ▼
+ShiftRows
+   │
+   ▼
+MixColumns
+   │
+   ▼
+AddRoundKey
+   │
+   ▼
+state_out
+```
+
+This block is used for AES rounds **1 through 9**.
+
+---
+
+## `aes_final_round.sv`
+
+Implements AES round 10.
+
+```text
+state_in
+   │
+   ▼
+SubBytes
+   │
+   ▼
+ShiftRows
+   │
+   ▼
+AddRoundKey
+   │
+   ▼
+state_out
+```
+
+Unlike the normal AES round, **MixColumns is not performed**.
+
+---
+
+## `round_controller.sv`
+
+Controls the sequential encryption process.
+
+```text
+IDLE
+  │
+  │ start
+  ▼
+INIT
+  │
+  ▼
+ROUND 1
+  │
+  ▼
+ROUND 2
+  │
+  ▼
+  ...
+  │
+  ▼
+ROUND 9
+  │
+  ▼
+ROUND 10
+  │
+  ▼
+DONE
+  │
+  ▼
+IDLE
+```
 
 Round numbering:
 
-    round = 0
-        -> initial AddRoundKey
+```text
+Round 0  → Initial AddRoundKey
+Rounds 1–9 → Normal AES rounds
+Round 10 → Final AES round
+```
 
-    round = 1 ... 9
-        -> normal AES round
+---
 
-    round = 10
-        -> final AES round
+# 6. AES Core
 
+## `aes_core.sv`
 
-============================================================
-18. AES CORE ARCHITECTURE
-============================================================
+`aes_core` is the top-level standalone AES encryption engine.
 
-The AES core uses an ITERATIVE architecture.
+### Interface
 
-There is only:
+```systemverilog
+input  logic         clk;
+input  logic         rst_n;
+input  logic         start;
 
-    ONE aes_round datapath
+input  logic [127:0] plaintext;
+input  logic [127:0] key;
 
-That hardware is reused for:
+output logic [127:0] ciphertext;
+output logic         busy;
+output logic         done;
+```
 
-    Round 1
-    Round 2
-    ...
-    Round 9
+### Operation
 
+```text
+plaintext
+    │
+    ▼
+Initial AddRoundKey
+    │
+    ▼
+AES Round 1
+    │
+    ▼
+AES Round 2
+    │
+    ▼
+...
+    │
+    ▼
+AES Round 9
+    │
+    ▼
+AES Final Round
+    │
+    ▼
+ciphertext
+```
 
-Conceptually:
+---
 
-             +-------------+
-             |  aes_round  |
-             +------+------+
-                    |
-                    v
-              state register
-                    |
-                    | next clock
-                    v
-             +-------------+
-             |  aes_round  |
-             +------+------+
-                    |
-                    v
-              state register
-                    |
+# 7. Iterative Architecture
+
+The current AES core uses an **iterative architecture**.
+
+Only one physical `aes_round` datapath is instantiated and reused for rounds 1–9.
+
+```text
+             ┌─────────────┐
+             │  aes_round  │
+             └──────┬──────┘
+                    │
+                    ▼
+              State Register
+                    │
+                    │ next clock
+                    ▼
+             ┌─────────────┐
+             │  aes_round  │
+             └──────┬──────┘
+                    │
+                    ▼
+              State Register
+                    │
                    ...
+```
 
+Therefore:
 
-ADVANTAGE:
+```text
+Round 1 → same hardware
+Round 2 → same hardware
+Round 3 → same hardware
+...
+Round 9 → same hardware
+```
 
-    Smaller hardware area.
+### Advantage
 
-TRADEOFF:
+Lower hardware area because the round datapath is reused.
 
-    More clock cycles per encryption.
+### Trade-off
 
-This gives an important VLSI area-vs-performance
-tradeoff for analysis.
+Higher encryption latency because multiple clock cycles are required for one AES block.
 
+This area-vs-latency trade-off will be evaluated during the VLSI stage.
 
-============================================================
-19. COMPLETE AES ENCRYPTION FLOW
-============================================================
+---
 
-Input:
+# 8. AES Core Interface
 
-    Plaintext
-    Key
+The standalone AES core accepts:
 
-        |
-        v
+| Signal | Width | Direction | Description |
+|---|---:|---|---|
+| `clk` | 1 | Input | Clock |
+| `rst_n` | 1 | Input | Active-low reset |
+| `start` | 1 | Input | Start encryption |
+| `plaintext` | 128 | Input | 128-bit plaintext |
+| `key` | 128 | Input | 128-bit AES key |
+| `ciphertext` | 128 | Output | 128-bit ciphertext |
+| `busy` | 1 | Output | Encryption in progress |
+| `done` | 1 | Output | Encryption complete |
 
-    Initial AddRoundKey
-        |
-        v
-    Round 1
-        |
-        v
-    Round 2
-        |
-        v
-       ...
-        |
-        v
-    Round 9
-        |
-        v
-    Round 10
-        |
-        v
-    Ciphertext
+---
 
+# 9. Verification
 
-Round 1-9:
+Every major RTL block has an associated testbench.
 
-    SubBytes
-    ShiftRows
-    MixColumns
-    AddRoundKey
+```text
+tb/
+├── aes_sbox_tb.sv
+├── sub_bytes_tb.sv
+├── shift_rows_tb.sv
+├── mix_columns_tb.sv
+├── add_round_key_tb.sv
+├── key_expansion_tb.sv
+├── aes_round_tb.sv
+├── aes_final_round_tb.sv
+├── round_controller_tb.sv
+└── aes_core_tb.sv
+```
 
+The complete AES core was verified using the standard AES-128 known-answer test vector.
 
-Round 10:
+---
 
-    SubBytes
-    ShiftRows
-    AddRoundKey
+# 10. AES-128 Known-Answer Test
 
+### Plaintext
 
-============================================================
-20. OFFICIAL AES-128 TEST VECTOR
-============================================================
+```text
+00112233445566778899AABBCCDDEEFF
+```
 
-Plaintext:
+### Key
 
-    00112233445566778899AABBCCDDEEFF
+```text
+000102030405060708090A0B0C0D0E0F
+```
 
-Key:
+### Expected Ciphertext
 
-    000102030405060708090A0B0C0D0E0F
+```text
+69C4E0D86A7B0430D8CDB78070B4C55A
+```
 
-Expected ciphertext:
+### Verification Result
 
-    69C4E0D86A7B0430D8CDB78070B4C55A
+```text
+AES_CORE PASS
+```
 
+The simulated ciphertext was:
 
-32-bit representation:
+```text
+69C4E0D86A7B0430D8CDB78070B4C55A
+```
 
-Plaintext:
+which matches the expected result exactly.
 
-    00112233
-    44556677
-    8899AABB
-    CCDDEEFF
+---
 
-Key:
+# 11. Simulation
 
-    00010203
-    04050607
-    08090A0B
-    0C0D0E0F
+The project uses **Icarus Verilog** for RTL simulation.
+
+Example:
 
-Ciphertext:
+```bash
+iverilog -g2012 -o sim/aes_core_tb.out \
+rtl/aes_sbox.sv \
+rtl/sub_bytes.sv \
+rtl/shift_rows.sv \
+rtl/mix_columns.sv \
+rtl/add_round_key.sv \
+rtl/key_expansion.sv \
+rtl/aes_round.sv \
+rtl/aes_final_round.sv \
+rtl/round_controller.sv \
+rtl/aes_core.sv \
+tb/aes_core_tb.sv
+```
+
+Run:
+
+```bash
+vvp sim/aes_core_tb.out
+```
+
+Expected result:
+
+```text
+AES_CORE PASS
+```
+
+---
+
+# 12. X-HEEP Integration
 
-    69C4E0D8
-    6A7B0430
-    D8CDB780
-    70B4C55A
+The standalone AES core is intentionally independent of X-HEEP.
 
+The planned architecture is:
 
-============================================================
-21. CURRENT VERIFICATION STATUS
-============================================================
-
-aes_sbox:
-
-    PASS
-
-sub_bytes:
-
-    PASS
-
-shift_rows:
-
-    PASS
-
-mix_columns:
-
-    PASS
-
-add_round_key:
-
-    PASS
-
-key_expansion:
-
-    PASS
-    Round 0 through Round 10 verified
-
-aes_round:
-
-    PASS
-
-aes_final_round:
-
-    PASS
-
-round_controller:
-
-    PASS
-
-aes_core:
-
-    PASS
-
-
-Complete AES-128 test:
-
-    PASS
-
-
-Plaintext:
-
-    00112233445566778899AABBCCDDEEFF
-
-Key:
-
-    000102030405060708090A0B0C0D0E0F
-
-Ciphertext:
-
-    69C4E0D86A7B0430D8CDB78070B4C55A
-
-
-============================================================
-22. SOFTWARE WORKFLOW
-============================================================
-
-Software should perform:
-
-    1. Write plaintext_0
-    2. Write plaintext_1
-    3. Write plaintext_2
-    4. Write plaintext_3
-
-    5. Write key_0
-    6. Write key_1
-    7. Write key_2
-    8. Write key_3
-
-    9. Write CONTROL.START = 1
-
-    10. Wait for STATUS.DONE
-
-    11. Read ciphertext_0
-    12. Read ciphertext_1
-    13. Read ciphertext_2
-    14. Read ciphertext_3
-
-    15. Compare result against expected AES ciphertext.
-
-
-============================================================
-23. SOFTWARE PSEUDOCODE
-============================================================
-
-aes_write_plaintext(
-    0x00112233,
-    0x44556677,
-    0x8899AABB,
-    0xCCDDEEFF
-);
-
-aes_write_key(
-    0x00010203,
-    0x04050607,
-    0x08090A0B,
-    0x0C0D0E0F
-);
-
-aes_start();
-
-while (!aes_done())
-    ;
-
-ciphertext_0 = aes_read(0x28);
-ciphertext_1 = aes_read(0x2C);
-ciphertext_2 = aes_read(0x30);
-ciphertext_3 = aes_read(0x34);
-
-
-Expected:
-
-    ciphertext_0 = 0x69C4E0D8
-    ciphertext_1 = 0x6A7B0430
-    ciphertext_2 = 0xD8CDB780
-    ciphertext_3 = 0x70B4C55A
-
-
-============================================================
-24. VLSI / PERFORMANCE WORK
-============================================================
-
-After X-HEEP integration, measure:
-
-    1. Area
-    2. Timing
-    3. Maximum frequency
-    4. Power
-    5. Encryption latency
-    6. Hardware cycles per AES block
-    7. Software AES cycles
-    8. Hardware/software speedup
-
-
-Main architectural tradeoff:
-
-    Iterative AES
-        |
-        +-- Lower area
-        |
-        +-- Higher latency
-        |
-        +-- Hardware reused across rounds
-
-
-Potential future optimization:
-
-    Parallel/unrolled AES rounds
-
-but this is NOT the current architecture.
-
-
-============================================================
-25. PROJECT RESPONSIBILITY SPLIT
-============================================================
-
-HARDWARE:
-
-    AES RTL
-    X-HEEP peripheral wrapper
-    Memory-mapped registers
-    Integration
-    RTL simulation
-    Synthesis
-    Timing
-    Area
-    Power
-
-
-SOFTWARE:
-
-    X-HEEP driver
-    C firmware
-    Register access
-    AES test vectors
-    Hardware verification from software
-    Software AES reference
-    Hardware vs software benchmark
-    Cycle-count comparison
-
-
-============================================================
-26. IMPORTANT CURRENT STATUS
-============================================================
-
-STANDALONE AES CORE:
-
-    COMPLETE AND VERIFIED.
-
-
-NOT YET COMPLETE:
-
-    X-HEEP peripheral wrapper
-    X-HEEP SoC integration
-    C driver
-    Firmware
-    Hardware/software benchmark
-    VLSI synthesis
-    PPA analysis
-
-
-The X-HEEP wrapper should be the ONLY layer that needs
-to know about X-HEEP-specific bus/peripheral signals.
-
-The internal AES modules should remain independent of X-HEEP.
-
-
-============================================================
-END OF SPECIFICATION
-============================================================
+```text
+              X-HEEP RISC-V CPU
+                     │
+                     │ Memory-Mapped I/O
+                     ▼
+            ┌──────────────────┐
+            │ AES Peripheral   │
+            │     Wrapper      │
+            └────────┬─────────┘
+                     │
+                     ▼
+                `aes_core`
+                     │
+                     ▼
+                Ciphertext
+```
+
+The X-HEEP-specific logic will be contained in the peripheral wrapper.
+
+The internal AES modules will remain independent of X-HEEP.
+
+---
+
+# 13. Proposed X-HEEP Register Map
+
+> **Note:** These addresses are provisional and will be finalized during X-HEEP integration.
+
+| Offset | Register | Access |
+|---|---|---|
+| `0x00` | `PLAINTEXT_0` | Write |
+| `0x04` | `PLAINTEXT_1` | Write |
+| `0x08` | `PLAINTEXT_2` | Write |
+| `0x0C` | `PLAINTEXT_3` | Write |
+| `0x10` | `KEY_0` | Write |
+| `0x14` | `KEY_1` | Write |
+| `0x18` | `KEY_2` | Write |
+| `0x1C` | `KEY_3` | Write |
+| `0x20` | `CONTROL` | Write |
+| `0x24` | `STATUS` | Read |
+| `0x28` | `CIPHERTEXT_0` | Read |
+| `0x2C` | `CIPHERTEXT_1` | Read |
+| `0x30` | `CIPHERTEXT_2` | Read |
+| `0x34` | `CIPHERTEXT_3` | Read |
+
+### Control Register
+
+```text
+CONTROL[0] = START
+```
+
+### Status Register
+
+```text
+STATUS[0] = BUSY
+STATUS[1] = DONE
+```
+
+---
+
+# 14. Software ↔ Hardware Data Mapping
+
+The 128-bit values will be accessed as four 32-bit words.
+
+### Plaintext
+
+```text
+PLAINTEXT_0 = 00112233
+PLAINTEXT_1 = 44556677
+PLAINTEXT_2 = 8899AABB
+PLAINTEXT_3 = CCDDEEFF
+```
+
+### Key
+
+```text
+KEY_0 = 00010203
+KEY_1 = 04050607
+KEY_2 = 08090A0B
+KEY_3 = 0C0D0E0F
+```
+
+### Expected Ciphertext
+
+```text
+CIPHERTEXT_0 = 69C4E0D8
+CIPHERTEXT_1 = 6A7B0430
+CIPHERTEXT_2 = D8CDB780
+CIPHERTEXT_3 = 70B4C55A
+```
+
+---
+
+# 15. Software Operation
+
+The intended software flow is:
+
+```text
+Write Plaintext
+      │
+      ▼
+Write Key
+      │
+      ▼
+Set START
+      │
+      ▼
+Wait for DONE
+      │
+      ▼
+Read Ciphertext
+      │
+      ▼
+Verify Result
+```
+
+The accelerator is multi-cycle, so software must wait for the encryption operation to complete before reading the ciphertext.
+
+---
+
+# 16. Project Directory
+
+```text
+AES128-XHEEP/
+│
+├── README.md
+│
+├── rtl/
+│   ├── add_round_key.sv
+│   ├── aes_core.sv
+│   ├── aes_final_round.sv
+│   ├── aes_round.sv
+│   ├── aes_sbox.sv
+│   ├── key_expansion.sv
+│   ├── mix_columns.sv
+│   ├── round_controller.sv
+│   ├── shift_rows.sv
+│   └── sub_bytes.sv
+│
+├── tb/
+│   ├── add_round_key_tb.sv
+│   ├── aes_core_tb.sv
+│   ├── aes_final_round_tb.sv
+│   ├── aes_round_tb.sv
+│   ├── aes_sbox_tb.sv
+│   ├── key_expansion_tb.sv
+│   ├── mix_columns_tb.sv
+│   ├── round_controller_tb.sv
+│   ├── shift_rows_tb.sv
+│   └── sub_bytes_tb.sv
+│
+├── sim/
+│   └── ...
+│
+├── synth/
+│   └── ...
+│
+└── constraints/
+    └── ...
+```
+
+---
+
+# 17. Future Work
+
+The remaining development stages are:
+
+1. **X-HEEP peripheral integration**
+2. Memory-mapped register implementation
+3. X-HEEP SoC integration
+4. C driver development
+5. Hardware/software verification
+6. Software AES reference implementation
+7. Hardware vs. software cycle benchmark
+8. RTL synthesis
+9. Timing analysis
+10. Area analysis
+11. Power analysis
+
+---
+
+# 18. Project Goal
+
+The final system will demonstrate a complete hardware/software AES-128 accelerator integrated into an X-HEEP RISC-V SoC.
+
+The target system is:
+
+```text
+                 X-HEEP SoC
+                     │
+              ┌──────┴──────┐
+              │   RISC-V    │
+              │     CPU     │
+              └──────┬──────┘
+                     │
+              Memory-Mapped I/O
+                     │
+                     ▼
+             ┌───────────────┐
+             │ AES-128       │
+             │ Accelerator   │
+             └───────┬───────┘
+                     │
+                     ▼
+                Ciphertext
+```
+
+The final evaluation will compare the hardware accelerator against a software AES implementation in terms of:
+
+- Correctness
+- Cycle count
+- Latency
+- Throughput
+- Hardware area
+- Timing
+- Power
+- Hardware/software speedup
+
+---
