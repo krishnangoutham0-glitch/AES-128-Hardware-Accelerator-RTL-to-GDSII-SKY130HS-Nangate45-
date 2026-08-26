@@ -811,6 +811,7 @@ The accelerator is multi-cycle, so software must wait for the encryption operati
 AES128-XHEEP/
 │
 ├── README.md
+├── .gitignore
 │
 ├── rtl/
 │   ├── add_round_key.sv
@@ -842,9 +843,28 @@ AES128-XHEEP/
 ├── synth/
 │   └── ...
 │
-└── constraints/
-    └── ...
-```
+├── constraints/
+│   ├── sky130hs_aes_core.sdc
+│   └── nan45_aes_core.sdc
+│
+├── physical_design/
+│   │
+│   ├── sky130hs/
+│   │   └── openroad/
+│   │       ├── gds/
+│   │       │   └── aes128_sky130hs.gds
+│   │       ├── reports/
+│   │       └── results/
+│   │
+│   └── nangate45/
+│       └── openroad/
+│           ├── gds/
+│           │   └── aes128_nangate45.gds
+│           ├── reports/
+│           └── results/
+│
+├── openroad.sh
+└── openroad_nan45.sh
 
 ---
 
@@ -868,11 +888,12 @@ The remaining development stages are:
 
 # 18. Project Goal
 
-The final system will demonstrate a complete hardware/software AES-128 accelerator integrated into an X-HEEP RISC-V SoC.
+The goal of this project is to develop a complete hardware/software AES-128 accelerator for integration into an **X-HEEP RISC-V SoC**.
+
+The current project provides a verified, synthesizable, and physically implemented standalone AES-128 hardware core. The next stage is to integrate this core into X-HEEP as a memory-mapped peripheral.
 
 The target system is:
 
-```text
                  X-HEEP SoC
                      │
               ┌──────┴──────┐
@@ -890,9 +911,8 @@ The target system is:
                      │
                      ▼
                 Ciphertext
-```
 
-The final evaluation will compare the hardware accelerator against a software AES implementation in terms of:
+The planned final evaluation will compare the hardware accelerator against a software AES implementation in terms of:
 
 - Correctness
 - Cycle count
@@ -902,5 +922,3 @@ The final evaluation will compare the hardware accelerator against a software AE
 - Timing
 - Power
 - Hardware/software speedup
-
----
