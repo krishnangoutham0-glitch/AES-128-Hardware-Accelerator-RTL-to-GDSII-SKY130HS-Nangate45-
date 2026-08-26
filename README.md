@@ -611,19 +611,24 @@ The standalone AES-128 core has been taken through synthesis, static timing anal
 | Metric | Result |
 |---|---:|
 | Synthesized chip area | **117,781.3008 µm²** |
-| Clock period | **10 ns** |
+| Clock period | **10.00 ns** |
 | Worst setup slack | **+1.5745 ns** |
 | Worst hold slack | **+0.1012 ns** |
-| Total reported power | **0.104 W (104 mW)** |
+| Total reported power | **104 mW** |
 | Final GDS | `physical_design/sky130hs/openroad/gds/` |
 
-The reported SKY130HS setup and hold paths meet the 10 ns timing constraint.
+The SKY130HS implementation meets the 10 ns clock constraint with positive setup and hold slack.
 
 ## Nangate45
 
 | Metric | Result |
 |---|---:|
 | Synthesized chip area | **16,015.3280 µm²** |
+| Clock period | **10.00 ns** |
+| Worst setup slack | **+8.03 ns** |
+| Hold violations | **9** |
+| Max capacitance violations | **3** |
+| Total reported power | **13.5 mW** |
 | Final GDS | `physical_design/nangate45/openroad/gds/` |
 
 The Nangate45 OpenROAD flow completed through:
@@ -644,32 +649,6 @@ Detailed Routing
 Filler / Finishing
     ↓
 Final GDS
-# 12. X-HEEP Integration
-
-The standalone AES core is intentionally independent of X-HEEP.
-
-The planned architecture is:
-
-```text
-              X-HEEP RISC-V CPU
-                     │
-                     │ Memory-Mapped I/O
-                     ▼
-            ┌──────────────────┐
-            │ AES Peripheral   │
-            │     Wrapper      │
-            └────────┬─────────┘
-                     │
-                     ▼
-                `aes_core`
-                     │
-                     ▼
-                Ciphertext
-```
-
-The X-HEEP-specific logic will be contained in the peripheral wrapper.
-
-The internal AES modules will remain independent of X-HEEP.
 
 ---
 
