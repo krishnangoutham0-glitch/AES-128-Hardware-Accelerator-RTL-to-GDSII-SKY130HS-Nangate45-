@@ -10,6 +10,8 @@ The project follows a modular RTL architecture where each AES transformation is 
 
 ## Project Status
 
+## Project Status
+
 ### Standalone AES-128 Core — Complete
 
 - [x] AES S-box
@@ -24,6 +26,20 @@ The project follows a modular RTL architecture where each AES transformation is 
 - [x] Complete AES-128 Core
 - [x] Standard AES-128 test-vector verification
 
+### VLSI Implementation — Complete
+
+- [x] RTL synthesis — SKY130HS
+- [x] Static timing analysis — SKY130HS
+- [x] RTL synthesis — Nangate45
+- [x] Static timing analysis — Nangate45
+- [x] OpenROAD physical design — SKY130HS
+- [x] OpenROAD physical design — Nangate45
+- [x] Final GDS generation — SKY130HS
+- [x] Final GDS generation — Nangate45
+- [x] Area analysis
+- [x] Power analysis
+- [x] Routing / physical-design DRC reports
+
 ### X-HEEP Integration — In Progress
 
 - [ ] X-HEEP peripheral wrapper
@@ -32,8 +48,6 @@ The project follows a modular RTL architecture where each AES transformation is 
 - [ ] C software driver
 - [ ] Hardware/software verification
 - [ ] Software vs hardware performance benchmark
-- [ ] Synthesis
-- [ ] Area, timing and power analysis
 
 ---
 
@@ -585,7 +599,51 @@ AES_CORE PASS
 ```
 
 ---
+# 12. VLSI Implementation
 
+The standalone AES-128 core has been taken through synthesis, static timing analysis, and OpenROAD physical implementation using two standard-cell technologies:
+
+- **SKY130HS**
+- **Nangate45**
+
+## SKY130HS
+
+| Metric | Result |
+|---|---:|
+| Synthesized chip area | **117,781.3008 µm²** |
+| Clock period | **10 ns** |
+| Worst setup slack | **+1.5745 ns** |
+| Worst hold slack | **+0.1012 ns** |
+| Total reported power | **0.104 W (104 mW)** |
+| Final GDS | `physical_design/sky130hs/openroad/gds/` |
+
+The reported SKY130HS setup and hold paths meet the 10 ns timing constraint.
+
+## Nangate45
+
+| Metric | Result |
+|---|---:|
+| Synthesized chip area | **16,015.3280 µm²** |
+| Final GDS | `physical_design/nangate45/openroad/gds/` |
+
+The Nangate45 OpenROAD flow completed through:
+
+```text
+Synthesis
+    ↓
+Floorplanning
+    ↓
+Placement
+    ↓
+Clock Tree Synthesis
+    ↓
+Global Routing
+    ↓
+Detailed Routing
+    ↓
+Filler / Finishing
+    ↓
+Final GDS
 # 12. X-HEEP Integration
 
 The standalone AES core is intentionally independent of X-HEEP.
