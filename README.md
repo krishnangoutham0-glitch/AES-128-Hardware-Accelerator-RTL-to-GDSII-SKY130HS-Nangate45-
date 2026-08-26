@@ -694,44 +694,43 @@ Combinational logic accounts for approximately **91.2%** of the reported power, 
 
 Both technologies were taken through the complete physical-design flow:
 
-``text
-RTL
- │
- ▼
-Synthesis
- │
- ▼
-Floorplanning
- │
- ▼
-Tapcell / Power Distribution Network
- │
- ▼
-Global Placement
- │
- ▼
-Detailed Placement
- │
- ▼
-Clock Tree Synthesis
- │
- ▼
-Global Routing
- │
- ▼
-Detailed Routing
- │
- ▼
-Filler Cell Insertion
- │
- ▼
-Final Physical Verification
- │
- ▼
-DEF / SPEF / Verilog
- │
- ▼
-Final GDSII
+1. **RTL**
+2. ↓
+3. **Synthesis**
+4. ↓
+5. **Floorplanning**
+6. ↓
+7. **Tapcell / Power Distribution Network**
+8. ↓
+9. **Global Placement**
+10. ↓
+11. **Detailed Placement**
+12. ↓
+13. **Clock Tree Synthesis**
+14. ↓
+15. **Global Routing**
+16. ↓
+17. **Detailed Routing**
+18. ↓
+19. **Filler Cell Insertion**
+20. ↓
+21. **Final Physical Verification**
+22. ↓
+23. **DEF / SPEF / Post-route Verilog**
+24. ↓
+25. **Final GDSII**
+
+The final physical-design outputs include:
+
+- **GDSII** — final layout database
+- **DEF** — final physical design
+- **SPEF** — extracted parasitics
+- **Post-route Verilog** — final netlist
+- **OpenROAD database** — final implementation database
+- **Timing reports**
+- **Power reports**
+- **Routing DRC reports**
+  
 # 13. Proposed X-HEEP Register Map
 
 > **Note:** These addresses are provisional and will be finalized during X-HEEP integration.
