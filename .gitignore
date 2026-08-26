@@ -16,3 +16,4 @@ sim/*.out
 
 # macOS
 .DS_Store
+archive_before_cleanup/
