@@ -1,6 +1,6 @@
 ============================================================
 AES-128 HARDWARE ACCELERATOR — VERILOG SPECIFICATION
-============================================================
+
 
 PROJECT:
 AES-128 Encryption Accelerator for X-HEEP
