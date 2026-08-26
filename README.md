@@ -601,56 +601,137 @@ AES_CORE PASS
 ---
 # 12. VLSI Implementation
 
-The standalone AES-128 core has been taken through synthesis, static timing analysis, and OpenROAD physical implementation using two standard-cell technologies:
+The standalone AES-128 core has been taken through synthesis, static timing analysis, and complete OpenROAD physical implementation using two standard-cell technologies:
 
 - **SKY130HS**
 - **Nangate45**
+
+Both implementations were taken through synthesis, floorplanning, placement, clock-tree synthesis, routing, filler insertion, and final GDS generation.
 
 ## SKY130HS
 
 | Metric | Result |
 |---|---:|
+| Standard-cell technology | **SKY130HS** |
+| Target clock period | **10.00 ns** |
+| Target frequency | **100 MHz** |
 | Synthesized chip area | **117,781.3008 µm²** |
-| Clock period | **10.00 ns** |
-| Worst setup slack | **+1.5745 ns** |
-| Worst hold slack | **+0.1012 ns** |
+| Sequential area | **10,183.4064 µm² (8.65%)** |
+| Post-route minimum clock period | **4.64 ns** |
+| Post-route maximum frequency | **215.61 MHz** |
+| Worst setup slack | **+5.36 ns** |
+| Worst hold slack | **+0.19 ns** |
+| WNS | **0.00 ns** |
+| TNS | **0.00 ns** |
+| Setup violations | **0** |
+| Hold violations | **0** |
+| Max slew violations | **0** |
+| Max fanout violations | **0** |
+| Max capacitance violations | **0** |
 | Total reported power | **104 mW** |
+| Internal power | **63.2 mW** |
+| Switching power | **40.4 mW** |
+| Leakage power | **0.996 µW** |
 | Final GDS | `physical_design/sky130hs/openroad/gds/` |
 
-The SKY130HS implementation meets the 10 ns clock constraint with positive setup and hold slack.
+The SKY130HS implementation is timing-clean at the 10 ns target clock period, with no setup, hold, slew, fanout, or capacitance violations in the final OpenROAD report. The post-route analysis reports a minimum achievable clock period of **4.64 ns**, corresponding to a maximum frequency of **215.61 MHz**. :contentReference[oaicite:2]{index=2}
+
+### SKY130HS Power Breakdown
+
+| Power Group | Internal | Switching | Leakage | Total |
+|---|---:|---:|---:|---:|
+| Sequential | 3.65 mW | 5.48 mW | 0.160 µW | 9.13 mW |
+| Combinational | 58.7 mW | 34.1 mW | 0.825 µW | 92.8 mW |
+| Clock | 0.927 mW | 0.816 mW | 0.0108 µW | 1.74 mW |
+| **Total** | **63.2 mW** | **40.4 mW** | **0.996 µW** | **104 mW** |
+
+The combinational logic accounts for the majority of the reported power at approximately **89.5%**, followed by sequential logic at **8.8%** and clock circuitry at **1.7%**. :contentReference[oaicite:3]{index=3}
+
+---
 
 ## Nangate45
 
 | Metric | Result |
 |---|---:|
+| Standard-cell technology | **Nangate45** |
+| Target clock period | **10.00 ns** |
+| Target frequency | **100 MHz** |
 | Synthesized chip area | **16,015.3280 µm²** |
-| Clock period | **10.00 ns** |
+| Sequential area | **1,473.6400 µm² (9.20%)** |
+| Post-route minimum clock period | **1.97 ns** |
+| Post-route maximum frequency | **507.92 MHz** |
 | Worst setup slack | **+8.03 ns** |
+| Worst hold slack | **0.00 ns (violated)** |
+| WNS | **0.00 ns** |
+| TNS | **0.00 ns** |
+| Setup violations | **0** |
 | Hold violations | **9** |
+| Max slew violations | **0** |
+| Max fanout violations | **0** |
 | Max capacitance violations | **3** |
 | Total reported power | **13.5 mW** |
+| Internal power | **6.47 mW** |
+| Switching power | **6.62 mW** |
+| Leakage power | **0.401 mW** |
 | Final GDS | `physical_design/nangate45/openroad/gds/` |
 
-The Nangate45 OpenROAD flow completed through:
+The Nangate45 implementation completed the full OpenROAD physical-design flow and provides substantially greater setup-timing headroom than SKY130HS. The final report gives a minimum achievable clock period of **1.97 ns**, corresponding to a maximum frequency of **507.92 MHz**. However, the implementation retains **9 hold violations** and **3 maximum-capacitance violations**. :contentReference[oaicite:4]{index=4}
 
-```text
-Synthesis
-    ↓
-Floorplanning
-    ↓
-Placement
-    ↓
-Clock Tree Synthesis
-    ↓
-Global Routing
-    ↓
-Detailed Routing
-    ↓
-Filler / Finishing
-    ↓
-Final GDS
+### Nangate45 Power Breakdown
+
+| Power Group | Internal | Switching | Leakage | Total |
+|---|---:|---:|---:|---:|
+| Sequential | 0.427 mW | 0.600 mW | 0.0274 mW | 1.05 mW |
+| Combinational | 5.99 mW | 5.95 mW | 0.371 mW | 12.3 mW |
+| Clock | 0.0532 mW | 0.0761 mW | 0.00188 mW | 0.131 mW |
+| **Total** | **6.47 mW** | **6.62 mW** | **0.401 mW** | **13.5 mW** |
+
+Combinational logic accounts for approximately **91.2%** of the reported power, sequential logic approximately **7.8%**, and clock circuitry approximately **1.0%**. :contentReference[oaicite:5]{index=5}
 
 ---
+
+## OpenROAD Physical Design Flow
+
+Both technologies were taken through the complete physical-design flow:
+
+```text
+RTL
+ │
+ ▼
+Synthesis
+ │
+ ▼
+Floorplanning
+ │
+ ▼
+Tapcell / Power Distribution Network
+ │
+ ▼
+Global Placement
+ │
+ ▼
+Detailed Placement
+ │
+ ▼
+Clock Tree Synthesis
+ │
+ ▼
+Global Routing
+ │
+ ▼
+Detailed Routing
+ │
+ ▼
+Filler Cell Insertion
+ │
+ ▼
+Final Physical Verification
+ │
+ ▼
+DEF / SPEF / Verilog
+ │
+ ▼
+Final GDSII
 
 # 13. Proposed X-HEEP Register Map
 
