@@ -1,0 +1,18 @@
+# Simulation executables
+sim/*.out
+
+# Waveforms
+*.vcd
+*.fst
+*.wlf
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# macOS
+.DS_Store
