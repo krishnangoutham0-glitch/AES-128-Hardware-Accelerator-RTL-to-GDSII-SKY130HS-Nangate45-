@@ -1,0 +1,55 @@
+CAPI=2:
+
+name: "example:ip:aes"
+description: "AES-128 hardware accelerator peripheral"
+
+filesets:
+
+  files_rtl:
+    depend:
+      - x-heep::packages
+      - xheep:util:reg-generator
+
+    files:
+      - rtl/aes.sv
+      - rtl/aes_core.sv
+      - rtl/round_controller.sv
+      - rtl/key_expansion.sv
+      - rtl/aes_round.sv
+      - rtl/aes_final_round.sv
+      - rtl/add_round_key.sv
+      - rtl/sub_bytes.sv
+      - rtl/shift_rows.sv
+      - rtl/mix_columns.sv
+      - rtl/aes_sbox.sv
+
+    file_type: systemVerilogSource
+
+
+  verilator-waiver:
+    files:
+      - aes.vlt
+    file_type: vlt
+
+
+generate:
+
+  aes-regs:
+    generator: regtool
+    parameters:
+      config: data/aes.hjson
+      name: aes
+      rtl_dir: rtl
+      sw_path: ../../../sw/device/lib/drivers/aes/aes.h
+      doc_path: ../../../sw/device/lib/drivers/aes/aes.md
+
+
+targets:
+
+  default:
+    filesets:
+      - files_rtl
+      - tool_verilator ? (verilator-waiver)
+
+    generate:
+      - aes-regs
