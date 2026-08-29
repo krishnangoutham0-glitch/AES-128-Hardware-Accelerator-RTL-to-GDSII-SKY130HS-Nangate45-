@@ -2,13 +2,11 @@
 
 ## AES-128 Encryption Accelerator
 
-A synthesizable **AES-128 encryption accelerator** implemented in SystemVerilog, designed for eventual integration as a memory-mapped peripheral in the **X-HEEP RISC-V SoC**.
+A synthesizable **AES-128 encryption accelerator** implemented in SystemVerilog, designed and integrated as a memory-mapped peripheral in the **X-HEEP RISC-V SoC**.
 
-The project follows a modular RTL architecture where each AES transformation is implemented and verified independently before being integrated into the complete encryption core.
+The project follows a modular RTL architecture where each AES transformation is implemented and verified independently before being integrated into the complete encryption core. The standalone AES core has also been taken through synthesis, timing analysis, and physical implementation using SKY130HS and Nangate45 standard-cell technologies.
 
 ---
-
-## Project Status
 
 ## Project Status
 
@@ -40,14 +38,23 @@ The project follows a modular RTL architecture where each AES transformation is 
 - [x] Power analysis
 - [x] Routing / physical-design DRC reports
 
-### X-HEEP Integration — In Progress
+### X-HEEP Integration — Complete
 
-- [ ] X-HEEP peripheral wrapper
-- [ ] Memory-mapped register interface
-- [ ] X-HEEP SoC integration
-- [ ] C software driver
-- [ ] Hardware/software verification
-- [ ] Software vs hardware performance benchmark
+- [x] X-HEEP peripheral wrapper
+- [x] Memory-mapped register interface
+- [x] X-HEEP SoC integration
+- [x] C software driver
+- [x] Hardware/software verification
+
+### SkyWater / SKY130 Integrated Flow — In Progress
+
+- [x] Standalone AES-128 SKY130HS implementation
+- [ ] X-HEEP-integrated AES synthesis using the SkyWater/SKY130 flow
+- [ ] X-HEEP-integrated physical design
+- [ ] X-HEEP-integrated timing analysis
+- [ ] X-HEEP-integrated power analysis
+- [ ] X-HEEP-integrated final GDS
+- [ ] Final hardware/software benchmark on the integrated implementation
 
 ---
 
@@ -101,8 +108,6 @@ The AES-128 key is also 128 bits:
 ---
 
 # 3. AES Encryption Flow
-
-The complete AES-128 encryption flow is:
 
 ```text
                  Plaintext
@@ -208,8 +213,6 @@ Input  : 53
 Output : ED
 ```
 
-The AES S-box is a standardized transformation and is not custom-designed for this project.
-
 ---
 
 ## `sub_bytes.sv`
@@ -266,8 +269,6 @@ This is one of the main arithmetic blocks in the AES datapath.
 ## `add_round_key.sv`
 
 Performs the AES AddRoundKey operation.
-
-The operation is simply:
 
 ```text
 state_out = state_in XOR round_key
@@ -385,9 +386,9 @@ IDLE
 Round numbering:
 
 ```text
-Round 0  → Initial AddRoundKey
-Rounds 1–9 → Normal AES rounds
-Round 10 → Final AES round
+Round 0       → Initial AddRoundKey
+Rounds 1–9    → Normal AES rounds
+Round 10      → Final AES round
 ```
 
 ---
@@ -486,13 +487,11 @@ Lower hardware area because the round datapath is reused.
 
 Higher encryption latency because multiple clock cycles are required for one AES block.
 
-This area-vs-latency trade-off will be evaluated during the VLSI stage.
+This area-vs-latency trade-off will be evaluated during the hardware/software benchmarking stage.
 
 ---
 
 # 8. AES Core Interface
-
-The standalone AES core accepts:
 
 | Signal | Width | Direction | Description |
 |---|---:|---|---|
@@ -599,6 +598,7 @@ AES_CORE PASS
 ```
 
 ---
+
 # 12. VLSI Implementation
 
 The standalone AES-128 core has been taken through synthesis, static timing analysis, and complete OpenROAD physical implementation using two standard-cell technologies:
@@ -634,7 +634,7 @@ Both implementations were taken through synthesis, floorplanning, placement, clo
 | Leakage power | **0.996 µW** |
 | Final GDS | `physical_design/sky130hs/openroad/gds/` |
 
-The SKY130HS implementation is timing-clean at the 10 ns target clock period, with no setup, hold, slew, fanout, or capacitance violations in the final OpenROAD report. The post-route analysis reports a minimum achievable clock period of **4.64 ns**, corresponding to a maximum frequency of **215.61 MHz**. :contentReference[oaicite:2]{index=2}
+The SKY130HS implementation is timing-clean at the 10 ns target clock period, with no setup, hold, slew, fanout, or capacitance violations in the final OpenROAD report. The post-route analysis reports a minimum achievable clock period of **4.64 ns**, corresponding to a maximum frequency of **215.61 MHz**.
 
 ### SKY130HS Power Breakdown
 
@@ -645,7 +645,7 @@ The SKY130HS implementation is timing-clean at the 10 ns target clock period, wi
 | Clock | 0.927 mW | 0.816 mW | 0.0108 µW | 1.74 mW |
 | **Total** | **63.2 mW** | **40.4 mW** | **0.996 µW** | **104 mW** |
 
-The combinational logic accounts for the majority of the reported power at approximately **89.5%**, followed by sequential logic at **8.8%** and clock circuitry at **1.7%**. :contentReference[oaicite:3]{index=3}
+The combinational logic accounts for the majority of the reported power.
 
 ---
 
@@ -675,7 +675,7 @@ The combinational logic accounts for the majority of the reported power at appro
 | Leakage power | **0.401 mW** |
 | Final GDS | `physical_design/nangate45/openroad/gds/` |
 
-The Nangate45 implementation completed the full OpenROAD physical-design flow and provides substantially greater setup-timing headroom than SKY130HS. The final report gives a minimum achievable clock period of **1.97 ns**, corresponding to a maximum frequency of **507.92 MHz**. However, the implementation retains **9 hold violations** and **3 maximum-capacitance violations**. :contentReference[oaicite:4]{index=4}
+The Nangate45 implementation completed the full OpenROAD physical-design flow and provides substantially greater setup-timing headroom than SKY130HS. The final report gives a minimum achievable clock period of **1.97 ns**, corresponding to a maximum frequency of **507.92 MHz**. However, the implementation retains **9 hold violations** and **3 maximum-capacitance violations**.
 
 ### Nangate45 Power Breakdown
 
@@ -686,13 +686,11 @@ The Nangate45 implementation completed the full OpenROAD physical-design flow an
 | Clock | 0.0532 mW | 0.0761 mW | 0.00188 mW | 0.131 mW |
 | **Total** | **6.47 mW** | **6.62 mW** | **0.401 mW** | **13.5 mW** |
 
-Combinational logic accounts for approximately **91.2%** of the reported power, sequential logic approximately **7.8%**, and clock circuitry approximately **1.0%**. :contentReference[oaicite:5]{index=5}
-
 ---
 
 ## OpenROAD Physical Design Flow
 
-Both technologies were taken through the complete physical-design flow:
+Both technologies were taken through:
 
 **RTL → Synthesis → Floorplanning → Tapcell / Power Distribution Network → Global Placement → Detailed Placement → Clock Tree Synthesis → Global Routing → Detailed Routing → Filler Cell Insertion → Final Physical Verification → DEF / SPEF / Post-route Verilog → Final GDSII**
 
@@ -706,10 +704,49 @@ The final physical-design outputs include:
 - **Timing reports**
 - **Power reports**
 - **Routing DRC reports**
-  
-# 13. Proposed X-HEEP Register Map
 
-> **Note:** These addresses are provisional and will be finalized during X-HEEP integration.
+---
+
+# 13. X-HEEP Integration
+
+The AES-128 accelerator has been integrated into the **X-HEEP RISC-V SoC** as a memory-mapped hardware peripheral.
+
+The integrated system follows:
+
+```text
+                 X-HEEP SoC
+                     │
+              ┌──────┴──────┐
+              │   RISC-V    │
+              │     CPU     │
+              └──────┬──────┘
+                     │
+              Memory-Mapped Bus
+                     │
+                     ▼
+             ┌───────────────┐
+             │ AES-128       │
+             │ Accelerator   │
+             └───────┬───────┘
+                     │
+                     ▼
+                Ciphertext
+```
+
+The integration includes:
+
+- AES hardware peripheral wrapper
+- Memory-mapped register interface
+- X-HEEP peripheral connection
+- Software-visible control/status registers
+- C software interface
+- Hardware/software verification
+
+---
+
+# 14. Proposed X-HEEP Register Map
+
+> **Note:** These addresses are provisional and will be finalized according to the final X-HEEP memory map.
 
 | Offset | Register | Access |
 |---|---|---|
@@ -745,9 +782,9 @@ The final physical-design outputs include:
 
 ---
 
-# 14. Software ↔ Hardware Data Mapping
+# 15. Software ↔ Hardware Data Mapping
 
-The 128-bit values will be accessed as four 32-bit words.
+The 128-bit values are accessed as four 32-bit words.
 
 ### Plaintext
 
@@ -778,7 +815,7 @@ CIPHERTEXT_3 = 70B4C55A
 
 ---
 
-# 15. Software Operation
+# 16. Software Operation
 
 The intended software flow is:
 
@@ -805,7 +842,104 @@ The accelerator is multi-cycle, so software must wait for the encryption operati
 
 ---
 
-# 16. Project Directory
+# 17. Software vs Hardware Performance Benchmark
+
+After the integrated X-HEEP system is finalized, the hardware AES accelerator can be compared against a software AES-128 implementation running on the X-HEEP RISC-V processor.
+
+The purpose is to measure the benefit of moving AES encryption from software into dedicated hardware.
+
+| Metric | Software AES | Hardware AES |
+|---|---:|---:|
+| Encryption latency | To be measured | To be measured |
+| CPU cycles / 128-bit block | To be measured | To be measured |
+| Throughput | To be measured | To be measured |
+| Hardware area | CPU/software only | AES accelerator area |
+| Power | To be measured | To be measured |
+
+### Benchmark Method
+
+The same plaintext and key will be encrypted using:
+
+1. A software AES-128 implementation running on the X-HEEP RISC-V CPU.
+2. The memory-mapped AES-128 hardware accelerator.
+
+For each implementation, the number of CPU cycles required to encrypt a 128-bit block will be measured.
+
+Hardware speedup will be calculated as:
+
+```text
+Speedup =
+Software encryption cycles
+--------------------------------
+Hardware encryption cycles
+```
+
+For example:
+
+```text
+Software = 10,000 cycles
+Hardware =    100 cycles
+
+Speedup = 10,000 / 100
+         = 100×
+```
+
+The actual speedup will be reported after the final integrated benchmark.
+
+---
+
+# 18. SkyWater / SKY130 Flow
+
+The current development stage focuses on taking the **X-HEEP-integrated AES-128 accelerator** through the SkyWater/SKY130 implementation flow.
+
+The intended flow is:
+
+```text
+X-HEEP + AES RTL
+        │
+        ▼
+   RTL Verification
+        │
+        ▼
+   Logic Synthesis
+        │
+        ▼
+   Timing Analysis
+        │
+        ▼
+   Floorplanning
+        │
+        ▼
+    Placement
+        │
+        ▼
+Clock Tree Synthesis
+        │
+        ▼
+     Routing
+        │
+        ▼
+Physical Verification
+        │
+        ▼
+    GDSII Output
+```
+
+The main objectives are to determine:
+
+- Integrated design area
+- Maximum operating frequency
+- Setup and hold timing
+- Power consumption
+- Routing quality
+- DRC status
+- Final GDS generation
+
+The previously completed standalone SKY130HS implementation provides a baseline for comparison with the full X-HEEP-integrated implementation.
+
+---
+
+# 19. Project Directory
 
 ```text
 AES128-XHEEP/
@@ -848,7 +982,6 @@ AES128-XHEEP/
 │   └── nan45_aes_core.sdc
 │
 ├── physical_design/
-│   │
 │   ├── sky130hs/
 │   │   └── openroad/
 │   │       ├── gds/
@@ -865,54 +998,68 @@ AES128-XHEEP/
 │
 ├── openroad.sh
 └── openroad_nan45.sh
+```
 
 ---
 
-# 17. Future Work
+# 20. Future Work
 
 The remaining development stages are:
 
-1. **X-HEEP peripheral integration**
-2. Memory-mapped register implementation
-3. X-HEEP SoC integration
-4. C driver development
-5. Hardware/software verification
-6. Software AES reference implementation
-7. Hardware vs. software cycle benchmark
-8. RTL synthesis
-9. Timing analysis
-10. Area analysis
-11. Power analysis
+1. **Complete the X-HEEP-integrated SkyWater/SKY130 implementation flow**
+2. Integrated design synthesis
+3. Integrated timing analysis
+4. Integrated power analysis
+5. Integrated physical design
+6. Final integrated GDS generation
+7. Software AES reference implementation
+8. Hardware vs. software cycle benchmark
+9. Hardware/software speedup analysis
+10. Final documentation and comparison
 
 ---
 
-# 18. Project Goal
+# 21. Project Goal
 
-The goal of this project is to develop a complete hardware/software AES-128 accelerator for integration into an **X-HEEP RISC-V SoC**.
+The goal of this project is to develop a complete hardware/software AES-128 accelerator integrated into an **X-HEEP RISC-V SoC** and evaluate it from RTL through physical implementation.
 
-The current project provides a verified, synthesizable, and physically implemented standalone AES-128 hardware core. The next stage is to integrate this core into X-HEEP as a memory-mapped peripheral.
+The project combines:
 
-The target system is:
+- AES-128 RTL design
+- Functional verification
+- RISC-V/X-HEEP SoC integration
+- Memory-mapped hardware acceleration
+- C software interaction
+- RTL synthesis
+- Static timing analysis
+- Physical design
+- Power analysis
+- GDS generation
+- Hardware/software performance comparison
 
-                 X-HEEP SoC
-                     │
-              ┌──────┴──────┐
-              │   RISC-V    │
-              │     CPU     │
-              └──────┬──────┘
-                     │
-              Memory-Mapped I/O
-                     │
-                     ▼
-             ┌───────────────┐
-             │ AES-128       │
-             │ Accelerator   │
-             └───────┬───────┘
-                     │
-                     ▼
-                Ciphertext
+The final system is intended to demonstrate the complete path from an AES algorithm to a physically implementable hardware accelerator integrated into a RISC-V SoC.
 
-The planned final evaluation will compare the hardware accelerator against a software AES implementation in terms of:
+```text
+                    X-HEEP SoC
+                         │
+                  ┌──────┴──────┐
+                  │   RISC-V    │
+                  │     CPU     │
+                  └──────┬──────┘
+                         │
+                  Memory-Mapped I/O
+                         │
+                         ▼
+                ┌─────────────────┐
+                │   AES-128       │
+                │   Accelerator    │
+                └────────┬────────┘
+                         │
+                         ▼
+                    Ciphertext
+```
+
+The final evaluation will compare the hardware accelerator against a software AES implementation in terms of:
 
 - Correctness
 - Cycle count
@@ -922,3 +1069,4 @@ The planned final evaluation will compare the hardware accelerator against a sof
 - Timing
 - Power
 - Hardware/software speedup
+- Physical implementation quality
